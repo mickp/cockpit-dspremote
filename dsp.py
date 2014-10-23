@@ -280,10 +280,8 @@ class Server(object):
 
 
     def run(self):
-        path = __path__[0]
-        files = [os.path.sep.join([_path, file])
-            for file in os.listdir(_path) if file.endswith('.conf')]
-        self.config = ConfigParser.ConfigParser()
+        import readconfig
+        self.config = readconfig.config
         self.config.read(files)
 
         blob = config.get(CONFIG_NAME, blob)
