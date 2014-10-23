@@ -1,8 +1,13 @@
 import pyC67
 
+import ConfigParser
+import os
 import Pyro4
 import threading
 import traceback
+
+CONFIG_NAME = 'DSP'
+
 
 def melError(xx):
     '''make Mel;s hex-error codes (ASCII) more readable by converting to
@@ -265,3 +270,50 @@ class CollectThread(threading.Thread):
         
         threading.Thread.join(self, timeout)
 
+
+class Server(object):
+    def __init__(self):
+        self.server = None
+        self.daemon_thread = None
+        self.config = None
+        self.run_flag = True
+
+
+    def run(self):
+        path = __path__[0]
+        files = [os.path.sep.join([_path, file])
+            for file in os.listdir(_path) if file.endswith('.conf')]
+        self.config = ConfigParser.ConfigParser()
+        self.config.read(files)
+
+        blob = config.get(CONFIG_NAME, blob)
+        host = config.get(CONFIG_NAME, ipAddress)
+        port = config.get(CONFIG_NAME, port)
+
+        self.server = d(blob)
+
+        daemon = Pyro4.Daemon(port=port, host=host)
+
+        # Start the daemon in a new thread.
+        self.daemon_thread = threading.Thread(
+            target=Pyro4.Daemon.serveSimple,
+            args = ({server: 'pyroDSP'}),
+            kwargs = {'daemon': daemon, 'ns': False}
+            )
+        self.daemon_thread.start()
+
+        # Wait until run_flag is set to False.
+        while self.run_flag:
+            sleep(1)
+
+        # Do any cleanup.
+        daemon.Shutdown()
+
+        if hasattr(self.server, 'collThread'):
+            self.server.collThread.stop()
+
+        self.daemon_thread.join()
+
+
+    def stop(self):
+        self.run_flag = False
