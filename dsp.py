@@ -279,6 +279,11 @@ class Server(object):
         self.config = None
         self.run_flag = True
 
+    def __del__(self):
+        self.run_flag = False
+        if self.daemon_thread:
+            self.daemon_thread.join()
+
 
     def run(self):
         import readconfig
