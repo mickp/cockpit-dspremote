@@ -8,7 +8,7 @@ import traceback
 from time import sleep
 
 CONFIG_NAME = 'dsp'
-
+PATH = os.path.dirname(os.path.abspath(__file__))
 
 def melError(xx):
     '''make Mel;s hex-error codes (ASCII) more readable by converting to
@@ -288,7 +288,7 @@ class Server(object):
         host = config.get(CONFIG_NAME, 'ipAddress')
         port = config.getint(CONFIG_NAME, 'port')
 
-        self.server = d(blob)
+        self.server = d(os.path.join(PATH, blob))
 
         daemon = Pyro4.Daemon(port=port, host=host)
 
