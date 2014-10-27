@@ -7,7 +7,7 @@ import threading
 import traceback
 from time import sleep
 
-CONFIG_NAME = 'DSP'
+CONFIG_NAME = 'dsp'
 
 
 def melError(xx):
@@ -282,12 +282,11 @@ class Server(object):
 
     def run(self):
         import readconfig
-        self.config = readconfig.config
-        self.config.read(files)
+        config = readconfig.config
 
-        blob = config.get(CONFIG_NAME, blob)
-        host = config.get(CONFIG_NAME, ipAddress)
-        port = config.get(CONFIG_NAME, port)
+        blob = config.get(CONFIG_NAME, 'blob')
+        host = config.get(CONFIG_NAME, 'ipAddress')
+        port = config.getint(CONFIG_NAME, 'port')
 
         self.server = d(blob)
 
@@ -296,7 +295,7 @@ class Server(object):
         # Start the daemon in a new thread.
         self.daemon_thread = threading.Thread(
             target=Pyro4.Daemon.serveSimple,
-            args = ({server: 'pyroDSP'}),
+            args = ({self.server: 'pyroDSP'},),
             kwargs = {'daemon': daemon, 'ns': False}
             )
         self.daemon_thread.start()
