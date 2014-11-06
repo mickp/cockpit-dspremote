@@ -9,6 +9,8 @@ from time import sleep
 
 CONFIG_NAME = 'dsp'
 PATH = os.path.dirname(os.path.abspath(__file__))
+Pyro4.config.SERIALIZER = 'pickle'
+Pyro4.config.SERIALIZERS_ACCEPTED.add('pickle')
 
 def melError(xx):
     '''make Mel;s hex-error codes (ASCII) more readable by converting to
@@ -310,7 +312,7 @@ class Server(object):
             sleep(1)
 
         # Do any cleanup.
-        daemon.Shutdown()
+        daemon.shutdown()
 
         if hasattr(self.server, 'collThread'):
             self.server.collThread.stop()
