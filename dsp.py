@@ -1,16 +1,19 @@
 import pyC67
 
 import ConfigParser
+import functools
 import os
 import Pyro4
 import threading
 import traceback
 from time import sleep
+import uuid
 
 CONFIG_NAME = 'dsp'
 PATH = os.path.dirname(os.path.abspath(__file__))
 Pyro4.config.SERIALIZER = 'pickle'
 Pyro4.config.SERIALIZERS_ACCEPTED.add('pickle')
+
 
 def melError(xx):
     '''make Mel;s hex-error codes (ASCII) more readable by converting to
@@ -33,11 +36,11 @@ class d:
 
 
     def receiveClient(self, uri):
-        print "receiveClient=",uri
+        # print "receiveClient=",uri
         self.clientConnection = Pyro4.Proxy(uri)
         self.collThread.setConnection(self.clientConnection)
         self.reInit()
-        print "clientConnection=",self.clientConnection
+        # print "clientConnection=",self.clientConnection
 
     def Abort(self):
         pyC67.Abort()
@@ -60,7 +63,7 @@ class d:
         try:
             pyC67.C67Open( self.fn )
         except Exception, e:
-            print "reInit failed:", e
+            # print "reInit failed:", e
             raise RuntimeError(" **** ERROR when C67Open( %s ) : %s" % (self.fn, e))
         
     def isCollecting(self):
@@ -115,15 +118,14 @@ class d:
     def DownloadProfile(self):
         pyC67.DownloadProfile()
 
-
     def trigSomething(self, doWhat):
-        self.collThread.do(doWhat)
+        self.collThread.do(doWhat, uid=uuid.uuid1())
 
     def trigCollect(self):
-        self.collThread.do('collect')
+        self.collThread.do('collect', uid=uuid.uuid1())
 
     def arcl(self, cameras, lightTimePairs):
-        self.collThread.do(('arcl', (cameras, lightTimePairs)))
+        self.collThread.do(('arcl', (cameras, lightTimePairs)), uid=uuid.uuid1())
 
 
     def getframedata(self):
@@ -168,97 +170,149 @@ class CollectThread(threading.Thread):
     """
     A sample thread class
     """
-        
+    class Logger():
+        def __init__(self):
+            import datetime
+            self.fh = None
+            self.dt = datetime.datetime
+
+        def log(self, msg):
+            return # do nothing for now
+            if not self.fh:
+                self.open('dsplog.txt')
+            self.fh.write(self.dt.strftime(self.dt.now(),'%Y-%m-%d %H:%M:%S.%f:  '))
+            self.fh.write(msg + '\n')
+            self.fh.flush()
+
+        def open(self, filename):
+            path = os.path.dirname(os.path.abspath(__file__))
+            self.fh = open(os.path.join(path, str(filename) + '.txt'), 'w')
+
+        def close(self):
+            self.fh.close()
+            self.fh = None
+
+
+
     def __init__(self, dObject):
         """
         Constructor, setting initial variables
         """
+        self.logger = CollectThread.Logger()
         self.d = dObject
         self.doEvent = threading.Event()
         self._sleepperiod = 1.0
         self.doEvent.doWhat = None
+        self.doEvent.uid = None
         self.clientConnection = None
+        self.eventLock = threading.Lock()
 
         threading.Thread.__init__(self, name="CollectThread")
 
-    def do(self, what):
-        if self.doEvent.isSet():
-            message = "CollectThread busy doing %s; can't do %s" % (self.doEvent.doWhat, str(what))
-            print message
-            raise RuntimeError(message)
-        self.doEvent.doWhat = what
-        self.doEvent.set()
+
+    def do(self, what, uid=None):
+        self.logger.log(str(uid) + ' ' + str(what) + ' received.')
+        # Wait for any previous event to finish.
+        while self.doEvent.isSet():
+            sleep(0.05)
+
+        with self.eventLock:
+            self.logger.log(str(uid) + ' lock acquired; setting event.')
+            self.doEvent.doWhat = what
+            self.doEvent.uid = uid
+            self.doEvent.set()
+
       
     def run(self):
         """
         overload of threading.thread.run()
         main control loop
         """
-        print "%s starts" % (self.getName(),)
+        # print "%s starts" % (self.getName(),)
         
         count = 0
         while 1:
-            self.doEvent.doWhat = None
-            self.doEvent.clear()
-            self.doEvent.wait( self._sleepperiod )
-            if self.doEvent.doWhat=='quit':         
-                break
-
-            if self.doEvent.doWhat=='collect':
-                try:
-                    del self.collectReturn
-                except:
-                    pass
-                try:
-                    retVal = pyC67.Collect()  # frameCount
-                except Exception, e: 
-                    retVal = e
-                self.collectReturn = retVal
-
-                retVal = retVal, [pyC67.ReadPosition(i) for i in range(4)]
-                self.clientConnection.receiveData("DSP done", retVal)
-                        
-            elif hasattr(self.doEvent.doWhat, '__len__') and self.doEvent.doWhat[0]=='arcl':
-                try:
-                    cameras, lightTimePairs = self.doEvent.doWhat[1]
-                    if lightTimePairs:
-                        # Expose all lights at the start, then drop them out
-                        # as their exposure times come to an end.
-                        # Sort so that the longest exposure time comes last.
-                        lightTimePairs.sort(key = lambda a: a[1])
-                        curDigital = cameras + sum([p[0] for p in lightTimePairs])
-                        self.d.WriteDigital(curDigital)
-                        print "Start with",curDigital
-                        totalTime = lightTimePairs[-1][1]
-                        curTime = 0
-                        for line, runTime in lightTimePairs:
-                            # Wait until we need to open this shutter.
-                            waitTime = runTime - curTime
-                            if waitTime > 0:
-                                pyC67.mmSleep(waitTime)
-                            curDigital -= line
-                            self.d.WriteDigital(curDigital)
-                            curTime += waitTime
-                            print "At",curTime,"set",curDigital
-                        if totalTime - curTime:
-                            pyC67.mmSleep(totalTime - curTime)
-                        print "Finally at",totalTime,"set",0
-                        self.d.WriteDigital(0)
-                    else:
-                        self.d.Expose(cameras)
-                except Exception, e:
-                    print "Error in arcl:",e
-                    traceback.print_exc()
-                    raise RuntimeError("Error in arcl: %s", e)
-                    
-            elif self.doEvent.doWhat is None:
+            count += 1
+            if count > 9:
+                count = 0
+                self.logger.log('10 run loops')
+            if not self.doEvent.wait(self._sleepperiod):
+                # Timeout - skip back to start of loop.
                 continue
-            else:
-                print "do unknown:", self.doEvent.doWhat
+
+            # There is an event to process.
+            with self.eventLock:
+                self.logger.log(str(self.doEvent.uid) + ' handling event.')
+                self.doEvent.clear()
+                if self.doEvent.doWhat=='quit':         
+                    break
+
+                if self.doEvent.doWhat=='collect':
+                    try:
+                        del self.collectReturn
+                    except:
+                        pass
+                    try:
+                        retVal = pyC67.Collect()  # frameCount
+                    except Exception, e: 
+                        retVal = e
+                    self.collectReturn = retVal
+
+                    retVal = retVal, [pyC67.ReadPosition(i) for i in range(4)]
+                    self.clientConnection.receiveData("DSP done", retVal)
+                            
+                elif hasattr(self.doEvent.doWhat, '__len__') and self.doEvent.doWhat[0]=='arcl':
+                    try:
+                        cameras, lightTimePairs = self.doEvent.doWhat[1]
+                        if lightTimePairs:
+                            # Expose all lights at the start, then drop them out
+                            # as their exposure times come to an end.
+                            # Sort so that the longest exposure time comes last.
+                            lightTimePairs.sort(key = lambda a: a[1])
+                            curDigital = cameras + sum([p[0] for p in lightTimePairs])
+                            self.d.WriteDigital(curDigital)
+                            # print "Start with",curDigital
+                            totalTime = lightTimePairs[-1][1]
+                            curTime = 0
+                            for line, runTime in lightTimePairs:
+                                # Wait until we need to open this shutter.
+                                waitTime = runTime - curTime
+                                if waitTime > 0:
+                                    pyC67.mmSleep(waitTime)
+                                curDigital -= line
+                                self.d.WriteDigital(curDigital)
+                                curTime += waitTime
+                                # print "At",curTime,"set",curDigital
+                            if totalTime - curTime:
+                                try:
+                                    pyC67.mmSleep(totalTime - curTime)
+                                except:
+                                    self.loggler.log('error in pyC67.mmSleep')
+                                    self.logger.log(traceback.format_exc())
+                            # # print "Finally at",totalTime,"set",0
+                            try:
+                                self.d.WriteDigital(0)
+                            except:
+                                self.logger.log('error in self.d.WriteDigital(0)')
+                                self.logger.log(traceback.format_exc())
+                        else:
+                            self.d.Expose(cameras)
+                    except Exception, e:
+                        # print "Error in arcl:",e
+                        self.logger.log('Error in arcl ... ' + str(e))
+                        self.logger.log(traceback.format_exc())
+                        #traceback.print_exc()
+                        raise RuntimeError("Error in arcl: %s", e)
+                        
+                elif self.doEvent.doWhat is None:
+                    pass
+                else:
+                    pass
+                    # print "do unknown:", self.doEvent.doWhat
 
                 
         
-        print "%s ends" % (self.getName(),)
+        # print "%s ends" % (self.getName(),)
 
 
     def setConnection(self, connection):
