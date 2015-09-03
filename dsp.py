@@ -9,6 +9,8 @@ import traceback
 from time import sleep
 import uuid
 
+LOGGING = False
+
 CONFIG_NAME = 'dsp'
 PATH = os.path.dirname(os.path.abspath(__file__))
 Pyro4.config.SERIALIZER = 'pickle'
@@ -177,7 +179,8 @@ class CollectThread(threading.Thread):
             self.dt = datetime.datetime
 
         def log(self, msg):
-            return # do nothing for now
+            if not LOGGING:
+                return # do nothing for now
             if not self.fh:
                 self.open('dsplog.txt')
             self.fh.write(self.dt.strftime(self.dt.now(),'%Y-%m-%d %H:%M:%S.%f:  '))
@@ -211,13 +214,12 @@ class CollectThread(threading.Thread):
 
 
     def do(self, what, uid=None):
-        self.logger.log(str(uid) + ' ' + str(what) + ' received.')
+        self.logger.log("%s: Do %s received." % (uid, what))
         # Wait for any previous event to finish.
         while self.doEvent.isSet():
             sleep(0.05)
 
         with self.eventLock:
-            self.logger.log(str(uid) + ' lock acquired; setting event.')
             self.doEvent.doWhat = what
             self.doEvent.uid = uid
             self.doEvent.set()
@@ -232,34 +234,38 @@ class CollectThread(threading.Thread):
         
         count = 0
         while 1:
-            count += 1
-            if count > 9:
-                count = 0
-                self.logger.log('10 run loops')
             if not self.doEvent.wait(self._sleepperiod):
                 # Timeout - skip back to start of loop.
                 continue
 
             # There is an event to process.
             with self.eventLock:
-                self.logger.log(str(self.doEvent.uid) + ' handling event.')
+                self.logger.log("%s: Handling event..." % self.doEvent.uid)
                 self.doEvent.clear()
-                if self.doEvent.doWhat=='quit':         
+                if self.doEvent.doWhat=='quit':  
+                    self.logger.log("%s: ... in quit block." % self.doEvent.uid)
                     break
 
                 if self.doEvent.doWhat=='collect':
+                    self.logger.log("%s: ... entered collect block." % self.doEvent.uid)
                     try:
                         del self.collectReturn
                     except:
                         pass
                     try:
+                        self.logger.log("%s: ... calling pyC67.Collect() ..." % self.doEvent.uid)
                         retVal = pyC67.Collect()  # frameCount
+                        self.logger.log("%s: ... pyC67.Collect() returned ..." % self.doEvent.uid)
                     except Exception, e: 
+                        self.logger.log("%s: ... exception in collect block." % self.doEvent.uid)
                         retVal = e
                     self.collectReturn = retVal
 
+                    self.logger.log("%s: ... calling pyC67.ReadPosition(i) for i in range(4) ..." % self.doEvent.uid)
                     retVal = retVal, [pyC67.ReadPosition(i) for i in range(4)]
+                    self.logger.log("%s: ... pyC67.ReadPosition() calls done ..." % self.doEvent.uid)
                     self.clientConnection.receiveData("DSP done", retVal)
+                    self.logger.log("%s: ... leaving collect block" % self.doEvent.uid)
                             
                 elif hasattr(self.doEvent.doWhat, '__len__') and self.doEvent.doWhat[0]=='arcl':
                     try:
