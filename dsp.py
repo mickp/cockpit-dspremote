@@ -399,5 +399,5 @@ def main():
         server_thread.join()
 
 
-if __name__ == 'main':
+if __name__ == '__main__':
     main()
