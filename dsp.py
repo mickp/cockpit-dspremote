@@ -28,9 +28,9 @@ def melError(xx):
 class d:
     def __init__(self, fn):
         self.fn = fn
+        self.clientConnection = None
         self.startCollectThread()
         self.reInit()
-        self.clientConnection = None
         self.MoveAbsolute(0, 10)
         self.WriteShutter(255)
 
@@ -204,7 +204,7 @@ class CollectThread(threading.Thread):
         self._sleepperiod = 1.0
         self.doEvent.doWhat = None
         self.doEvent.uid = None
-        self.clientConnection = None
+        self.clientConnection = self.d.clientConnection
         self.eventLock = threading.Lock()
 
         threading.Thread.__init__(self, name="CollectThread")
