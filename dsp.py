@@ -27,6 +27,7 @@ def melError(xx):
         xx>>=8
     return s
 
+@Pyro4.expose
 class d:
     def __init__(self, fn):
         self.fn = fn
