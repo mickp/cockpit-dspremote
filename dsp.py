@@ -9,7 +9,7 @@ import traceback
 from time import sleep
 import uuid
 
-LOGGING = False
+LOGGING = True
 
 CONFIG_NAME = 'dsp'
 PATH = os.path.dirname(os.path.abspath(__file__))
@@ -26,6 +26,32 @@ def melError(xx):
         s='%c%s'%((xx&0xff),s)
         xx>>=8
     return s
+
+
+class Logger(object):
+    def __init__(self):
+        import datetime
+        self.fh = None
+        self.dt = datetime.datetime
+
+    def log(self, msg):
+        if not LOGGING:
+            return # do nothing for now
+        if not self.fh:
+            self.open('dsplog')
+        self.fh.write(self.dt.strftime(self.dt.now(),'%Y-%m-%d %H:%M:%S.%f:  '))
+        self.fh.write(msg + '\n')
+        self.fh.flush()
+
+    def open(self, filename):
+        path = os.path.dirname(os.path.abspath(__file__))
+        self.fh = open(os.path.join(path, str(filename) + '.txt'), 'w')
+
+    def close(self):
+        self.fh.close()
+        self.fh = None
+
+_logger = Logger()
 
 @Pyro4.expose
 class d:
@@ -47,6 +73,7 @@ class d:
 
     def Abort(self):
         pyC67.Abort()
+        _logger.log('Abort %s' % self.ReadPosition(0))
         self.startCollectThread()
         
     def UpdateNReps(self, newCount):
@@ -62,6 +89,7 @@ class d:
             return melError(int(code,16))
         else:
             return melError(code)
+
     def reInit(self):
         try:
             pyC67.C67Open( self.fn )
@@ -77,7 +105,11 @@ class d:
     
     
     def ReadPosition(self, axis):
-        return pyC67.ReadPosition(axis)
+        if self.isCollecting():
+            return 0.0
+        else:
+            return pyC67.ReadPosition(axis)
+
     def ReadActual(self, axis):
         return pyC67.ReadActual(axis)
         
@@ -93,12 +125,15 @@ class d:
         pyC67.SetBase(axis,value)
 
     def MoveAbsolute(self, axis, target):
+        _logger.log('Move axis %d to %s V' % (axis, target))
         pyC67.MoveAbsolute(axis, target)
 
     def MoveAbsoluteADU(self, axis, target):
+        _logger.log('Move axis %d to %s ADU' % (axis, target))
         pyC67.MoveAbsoluteADU(axis, target)
 
     def MoveRelative(self, axis, target):
+        _logger.log('Move axis %d by %s V' % (axis, target))
         pyC67.MoveRelative(axis, target)
 
     def Expose(self, CamMask):
@@ -109,6 +144,7 @@ class d:
 
     def ReadDigital(self):
         return pyC67.ReadDigital()
+
     def WriteDigital(self, value):
         pyC67.WriteDigital(value)
 
@@ -116,9 +152,11 @@ class d:
         return pyC67.ReadCurPos(axis)
 
     def InitProfile(self, reps):
+        _logger.log('InitProfile')
         r = pyC67.InitProfile(reps)
 
     def DownloadProfile(self):
+        _logger.log('DownloadProfile')
         pyC67.DownloadProfile()
 
     def trigSomething(self, doWhat):
@@ -173,36 +211,11 @@ class CollectThread(threading.Thread):
     """
     A sample thread class
     """
-    class Logger():
-        def __init__(self):
-            import datetime
-            self.fh = None
-            self.dt = datetime.datetime
-
-        def log(self, msg):
-            if not LOGGING:
-                return # do nothing for now
-            if not self.fh:
-                self.open('dsplog.txt')
-            self.fh.write(self.dt.strftime(self.dt.now(),'%Y-%m-%d %H:%M:%S.%f:  '))
-            self.fh.write(msg + '\n')
-            self.fh.flush()
-
-        def open(self, filename):
-            path = os.path.dirname(os.path.abspath(__file__))
-            self.fh = open(os.path.join(path, str(filename) + '.txt'), 'w')
-
-        def close(self):
-            self.fh.close()
-            self.fh = None
-
-
 
     def __init__(self, dObject):
         """
         Constructor, setting initial variables
         """
-        self.logger = CollectThread.Logger()
         self.d = dObject
         self.doEvent = threading.Event()
         self._sleepperiod = 1.0
@@ -215,7 +228,7 @@ class CollectThread(threading.Thread):
 
 
     def do(self, what, uid=None):
-        self.logger.log("%s: Do %s received." % (uid, what))
+        _logger.log("%s: Do %s received." % (uid, what))
         # Wait for any previous event to finish.
         while self.doEvent.isSet():
             sleep(0.05)
@@ -241,32 +254,32 @@ class CollectThread(threading.Thread):
 
             # There is an event to process.
             with self.eventLock:
-                self.logger.log("%s: Handling event..." % self.doEvent.uid)
+                _logger.log("%s: Handling event..." % self.doEvent.uid)
                 self.doEvent.clear()
                 if self.doEvent.doWhat=='quit':  
-                    self.logger.log("%s: ... in quit block." % self.doEvent.uid)
+                    _logger.log("%s: ... in quit block." % self.doEvent.uid)
                     break
 
                 if self.doEvent.doWhat=='collect':
-                    self.logger.log("%s: ... entered collect block." % self.doEvent.uid)
+                    _logger.log("%s: ... entered collect block." % self.doEvent.uid)
                     try:
                         del self.collectReturn
                     except:
                         pass
                     try:
-                        self.logger.log("%s: ... calling pyC67.Collect() ..." % self.doEvent.uid)
+                        _logger.log("%s: ... calling pyC67.Collect() ..." % self.doEvent.uid)
                         retVal = pyC67.Collect()  # frameCount
-                        self.logger.log("%s: ... pyC67.Collect() returned ..." % self.doEvent.uid)
+                        _logger.log("%s: ... pyC67.Collect() returned ..." % self.doEvent.uid)
                     except Exception, e: 
-                        self.logger.log("%s: ... exception in collect block." % self.doEvent.uid)
+                        _logger.log("%s: ... exception in collect block." % self.doEvent.uid)
                         retVal = e
                     self.collectReturn = retVal
 
-                    self.logger.log("%s: ... calling pyC67.ReadPosition(i) for i in range(4) ..." % self.doEvent.uid)
+                    _logger.log("%s: ... calling pyC67.ReadPosition(i) for i in range(4) ..." % self.doEvent.uid)
                     retVal = retVal, [pyC67.ReadPosition(i) for i in range(4)]
-                    self.logger.log("%s: ... pyC67.ReadPosition() calls done ..." % self.doEvent.uid)
+                    _logger.log("%s: ... pyC67.ReadPosition() calls done ..." % self.doEvent.uid)
                     self.clientConnection.receiveData("DSP done", retVal)
-                    self.logger.log("%s: ... leaving collect block" % self.doEvent.uid)
+                    _logger.log("%s: ... leaving collect block" % self.doEvent.uid)
                             
                 elif hasattr(self.doEvent.doWhat, '__len__') and self.doEvent.doWhat[0]=='arcl':
                     try:
@@ -295,19 +308,19 @@ class CollectThread(threading.Thread):
                                     pyC67.mmSleep(totalTime - curTime)
                                 except:
                                     self.loggler.log('error in pyC67.mmSleep')
-                                    self.logger.log(traceback.format_exc())
+                                    _logger.log(traceback.format_exc())
                             # # print "Finally at",totalTime,"set",0
                             try:
                                 self.d.WriteDigital(0)
                             except:
-                                self.logger.log('error in self.d.WriteDigital(0)')
-                                self.logger.log(traceback.format_exc())
+                                _logger.log('error in self.d.WriteDigital(0)')
+                                _logger.log(traceback.format_exc())
                         else:
                             self.d.Expose(cameras)
                     except Exception, e:
                         # print "Error in arcl:",e
-                        self.logger.log('Error in arcl ... ' + str(e))
-                        self.logger.log(traceback.format_exc())
+                        _logger.log('Error in arcl ... ' + str(e))
+                        _logger.log(traceback.format_exc())
                         #traceback.print_exc()
                         raise RuntimeError("Error in arcl: %s", e)
                         
