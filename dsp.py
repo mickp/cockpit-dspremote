@@ -14,8 +14,8 @@ LOGGING = False
 CONFIG_NAME = 'dsp'
 PATH = os.path.dirname(os.path.abspath(__file__))
 Pyro4.config.SERIALIZER = 'pickle'
+Pyro4.config.SERIALIZERS_ACCEPTED.remove('serpent')
 Pyro4.config.SERIALIZERS_ACCEPTED.add('pickle')
-
 
 def melError(xx):
     '''make Mel;s hex-error codes (ASCII) more readable by converting to
@@ -31,9 +31,9 @@ def melError(xx):
 class d:
     def __init__(self, fn):
         self.fn = fn
-        self.clientConnection = None
         self.startCollectThread()
         self.reInit()
+        self.clientConnection = None
         self.MoveAbsolute(0, 10)
         self.WriteShutter(255)
 
@@ -208,7 +208,7 @@ class CollectThread(threading.Thread):
         self._sleepperiod = 1.0
         self.doEvent.doWhat = None
         self.doEvent.uid = None
-        self.clientConnection = self.d.clientConnection
+        self.clientConnection = None
         self.eventLock = threading.Lock()
 
         threading.Thread.__init__(self, name="CollectThread")
@@ -384,8 +384,7 @@ class Server(object):
     def stop(self):
         self.run_flag = False
 
-
-def main():
+def main ():
     ## Only run when called as a script --- do not run on include.
     #  This way, we can use an interactive shell to test out the class.
     server = Server()
@@ -394,11 +393,10 @@ def main():
 
     try:
         while True:
-            time.sleep(1)
+            sleep(1)
     except (KeyboardInterrupt, SystemExit):
         server.stop()
         server_thread.join()
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
