@@ -90,8 +90,6 @@ class d:
         description['nDigital'] = descriptionDict['nDigital']
         description['nAnalog'] = descriptionDict['nAnalog']
 
-        _logger.log("Digitals: %d" % (len(digList)))
-
         pyC67.Profile_Set(description.tostring(), digList, anaDeltaList0, anaDeltaList1, anaDeltaList2, anaDeltaList3)
 
 
