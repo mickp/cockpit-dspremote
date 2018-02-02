@@ -77,8 +77,22 @@ class d:
     def UpdateNReps(self, newCount):
         pyC67.UpdateNReps( newCount )
 
-    def profileSet(self, string, digList, anaDeltaList0, anaDeltaList1, anaDeltaList2, anaDeltaList3 ):
-        pyC67.Profile_Set(string, digList, anaDeltaList0, anaDeltaList1, anaDeltaList2, anaDeltaList3)
+    def profileSet(self, descriptionDict, digList, anaDeltaList0, anaDeltaList1, anaDeltaList2, anaDeltaList3):
+        import numpy as np
+        description = np.rec.array(
+            None,
+            formats="u4, f4, u4, u4, 4u4",
+            names=('count', 'clock', 'InitDio', 'nDigital', 'nAnalog'),
+            aligned=True, shape=1)
+        description['count'] = descriptionDict['count']
+        description['clock'] = descriptionDict['clock']
+        description['InitDio'] = descriptionDict['InitDio']
+        description['nDigital'] = descriptionDict['nDigital']
+        description['nAnalog'] = descriptionDict['nAnalog']
+
+        _logger.log("Digitals: %d" % (len(digList)))
+
+        pyC67.Profile_Set(description.tostring(), digList, anaDeltaList0, anaDeltaList1, anaDeltaList2, anaDeltaList3)
 
 
     def melError(self, code):
