@@ -65,11 +65,9 @@ class d:
 
 
     def receiveClient(self, uri):
-        # print "receiveClient=",uri
         self.clientConnection = Pyro4.Proxy(uri)
         self.collThread.setConnection(self.clientConnection)
-        self.reInit()
-        # print "clientConnection=",self.clientConnection
+        #self.reInit()
 
     def Abort(self):
         pyC67.Abort()
