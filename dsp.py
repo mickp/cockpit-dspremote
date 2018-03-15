@@ -56,22 +56,21 @@ _logger = Logger()
 @Pyro4.expose
 class d:
     def __init__(self, fn):
+        self._profileInited = False
         self.fn = fn
-        self.startCollectThread()
-        self.reInit()
         self.clientConnection = None
-        self.MoveAbsolute(0, 10)
+        self.reInit()
         self.WriteShutter(255)
 
-
     def receiveClient(self, uri):
+        _logger.log('Setting client to %s' % (uri))
         self.clientConnection = Pyro4.Proxy(uri)
         self.collThread.setConnection(self.clientConnection)
         #self.reInit()
 
     def Abort(self):
         pyC67.Abort()
-        _logger.log('Abort %s' % self.ReadPosition(0))
+        _logger.log('Abort')
         self.startCollectThread()
         
     def UpdateNReps(self, newCount):
@@ -106,6 +105,8 @@ class d:
         except Exception, e:
             # print "reInit failed:", e
             raise RuntimeError(" **** ERROR when C67Open( %s ) : %s" % (self.fn, e))
+        # Restart the collect thread.
+        self.startCollectThread()
         
     def isCollecting(self):
         return pyC67.cvar.collecting
@@ -164,16 +165,24 @@ class d:
     def InitProfile(self, reps):
         _logger.log('InitProfile')
         r = pyC67.InitProfile(reps)
+        self._profileInited = True
 
     def DownloadProfile(self):
         _logger.log('DownloadProfile')
+        self._profileInited = False
         pyC67.DownloadProfile()
 
     def trigSomething(self, doWhat):
         self.collThread.do(doWhat, uid=uuid.uuid1())
 
     def trigCollect(self):
+        # If trigCollect is called without first downloading and initing a profile,
+        # this process dies abruptly (presumably hitting some access violation in 
+        # the low-level code?). Don't let this happen.
+        if not self._profileInited:
+            raise Exception("Need to InitProfile before trigCollect.")
         self.collThread.do('collect', uid=uuid.uuid1())
+        self._profileInited = False
 
     def arcl(self, cameras, lightTimePairs):
         self.collThread.do(('arcl', (cameras, lightTimePairs)), uid=uuid.uuid1())
@@ -182,12 +191,6 @@ class d:
     def getframedata(self):
         numframe = pyC67.GetFrameCount()
         import numpy as N
-        #from numarray import records as rec
-        #fd=rec.array(formats="u4,u4,4f4",
-        #             shape=numframe,
-        #             names=('rep','step','adc'),
-        #             aligned=1)
-        #aa = na.array(sequence=fd._data, type=na.UInt8, copy=0, savespace=0, shape=numframe*6*4)
         fd = N.recarray(numframe,
                         formats="u4,u4,4f4",
                         names='rep,step,adc')
@@ -205,6 +208,8 @@ class d:
             pass
         self.collThread = CollectThread(self)
         self.collThread.start()
+        if self.clientConnection:
+            self.collThread.setConnection(self.clientConnection)
 
 
     #just for debugging
