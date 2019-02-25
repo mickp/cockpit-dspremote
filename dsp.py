@@ -8,7 +8,11 @@ import uuid
 
 import ctypes
 
-pyC67 = ctypes.CDLL("C67")
+try:
+    pyC67 = ctypes.CDLL("C67")
+except:
+    fn = os.path.join(os.path.dirname(__file__), "C67.dll")
+    pyC67 = ctypes.CDLL(fn)
 
 LOGGING = True
 
