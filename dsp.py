@@ -8,7 +8,7 @@ import uuid
 
 import ctypes
 
-pyC67 = ctypes.WinDLL("C67")
+pyC67 = ctypes.CDLL("C67")
 
 LOGGING = True
 
