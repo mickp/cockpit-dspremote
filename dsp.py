@@ -142,7 +142,7 @@ class d:
 
     def MoveAbsoluteADU(self, axis, target):
         _logger.log('Move axis %d to %s ADU' % (axis, target))
-        pyC67.MoveAbsoluteADU(axis, target)
+        pyC67.MoveAbsolute(axis, target)
 
     def MoveRelative(self, axis, target):
         _logger.log('Move axis %d by %s V' % (axis, target))
