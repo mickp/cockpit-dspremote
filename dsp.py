@@ -1,13 +1,14 @@
-import pyC67
-
 import ConfigParser
-import functools
 import os
 import Pyro4
 import threading
 import traceback
-from time import sleep
+import time
 import uuid
+
+import ctypes
+
+pyC67 = ctypes.WinDLL("C67")
 
 LOGGING = True
 
@@ -201,7 +202,6 @@ class d:
         return fd
 
     def startCollectThread(self):
-        pyC67.mmInitMMTimer()
         try:
             self.collThread.doEvent.doWhat = 'quit'
         except:
@@ -306,25 +306,22 @@ class CollectThread(threading.Thread):
                             lightTimePairs.sort(key = lambda a: a[1])
                             curDigital = cameras + sum([p[0] for p in lightTimePairs])
                             self.d.WriteDigital(curDigital)
-                            # print "Start with",curDigital
                             totalTime = lightTimePairs[-1][1]
                             curTime = 0
                             for line, runTime in lightTimePairs:
                                 # Wait until we need to open this shutter.
                                 waitTime = runTime - curTime
                                 if waitTime > 0:
-                                    pyC67.mmSleep(waitTime)
+                                    time.sleep(waitTime / 1000.)
                                 curDigital -= line
                                 self.d.WriteDigital(curDigital)
                                 curTime += waitTime
-                                # print "At",curTime,"set",curDigital
                             if totalTime - curTime:
                                 try:
-                                    pyC67.mmSleep(totalTime - curTime)
+                                    time.sleep( (totalTime - curTime) / 1000.)
                                 except:
                                     self.loggler.log('error in pyC67.mmSleep')
                                     _logger.log(traceback.format_exc())
-                            # # print "Finally at",totalTime,"set",0
                             try:
                                 self.d.WriteDigital(0)
                             except:
@@ -333,22 +330,15 @@ class CollectThread(threading.Thread):
                         else:
                             self.d.Expose(cameras)
                     except Exception, e:
-                        # print "Error in arcl:",e
                         _logger.log('Error in arcl ... ' + str(e))
                         _logger.log(traceback.format_exc())
-                        #traceback.print_exc()
                         raise RuntimeError("Error in arcl: %s", e)
                         
                 elif self.doEvent.doWhat is None:
                     pass
                 else:
                     pass
-                    # print "do unknown:", self.doEvent.doWhat
-
-                
-        
-        # print "%s ends" % (self.getName(),)
-
+                    _logger.log('Unknown doEvent.doWhat: %s' % self.doEvent.doWhat)
 
     def setConnection(self, connection):
         self.clientConnection = connection
@@ -398,7 +388,7 @@ class Server(object):
 
         # Wait until run_flag is set to False.
         while self.run_flag:
-            sleep(1)
+            time.sleep(1)
 
         # Do any cleanup.
         daemon.shutdown()
@@ -421,7 +411,7 @@ def main ():
 
     try:
         while True:
-            sleep(1)
+            time.sleep(1)
     except (KeyboardInterrupt, SystemExit):
         server.stop()
         server_thread.join()
