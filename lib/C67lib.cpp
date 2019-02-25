@@ -7,24 +7,10 @@ extern "C";
 
 CARDINFO* dsp = NULL;
 
-//20060902  float	MaxMicrons[NUMDAC] = {39.719F,39.694F,39.620F,100.F};	// per JWS
-//20060902  float	MinMicrons[NUMDAC] = {0.,0.,0.,0.};
-//float	MicronsPerADU[NUMDAC] = {5.9029E-4F,5.89606E-4F,5.88924E-4F,15.259E-4F}; //per JWS
-float	MicronsPerADU[NUMDAC] = {5.9029E-4F,5.89606E-4F,5.88924E-4F,15.259E-4F}; //z-fixed:2004/0519
-// >>> ma = U.arrF(39.719,39.694,39.620,100.)
-// >>> mpa = U.arrF(5.9029E-4,5.89606E-4,5.88924E-4,15.259E-4)
-// >>> ma / mpa  # maxMicron/umPerADU = maxADU
-// [[ 67287.265625  67322.921875  67275.234375  65535.09375 ]]
-
-//20060829  float	UpperLimit[NUMDAC];
-//20060829  float	LowerLimit[NUMDAC];
-
 ProStr profileHdr;
 void *FrameData = NULL;
 void *framePtr;
 ContextStr	myContext;
-
-
 
 //20060829  unsigned int *DioPtr = NULL;
 //20060829  float *AmpPtr[NUMDAC];
@@ -33,8 +19,6 @@ ContextStr	myContext;
 timeValuePair *digitalList = NULL;
 timeValuePair *analogList[NUMDAC];
 float	Base[NUMDAC];
-
-
 
 HANDLE	C67InternalEvent= NULL;
 //HANDLE	C67UserEvent = NULL;
@@ -249,9 +233,9 @@ void PrintError(char *str)
 	printf("%s\n",str);
 }
 
-float	ReadPosition(int axis)
+unsigned int ReadPosition(int axis)
 {
-	int position;
+	unsigned int position;
 
 	if(collecting) { throw (char*)"DSP is still collecting"; } // seb
 	DebugPrint("In ReadPosition stub\n");
@@ -263,10 +247,10 @@ float	ReadPosition(int axis)
 
 	DebugPrint("Waiting...\n");
 	position=ReadReply();
-	return ADUToMicron(axis,position);
+	return position;
 }
 
-float	ReadActual(int axis)
+unsigned int	ReadActual(int axis)
 {
 	int	position;
 
@@ -277,7 +261,7 @@ float	ReadActual(int axis)
 	int com=READ_ACTUAL_0+axis;
 	WriteCommand( com  );
 	position = ReadReply();
-	return ADUToMicron(axis,position);
+	return position;
 }
 
 void WriteShutter(int value)
@@ -347,18 +331,12 @@ void SetBaseAbsolute(int	axis, float value)
 	  throw (char*)"SetBaseAbsolute would go beyond range limits";
 }
 */
-void SetBase(int axis, float value)
+void SetBase(int axis, unsigned int value)
 {
 	int rtn;
 	DebugPrint("In SetBase stub\n");
-	int p=MicronToADU(axis,value);
 	int com=SET_BASE_0+axis;
-	WriteCommand( com | (p<<8) );
-	
-	//WriteCommand(SET_BASE);
-	//WriteParam(axis);
-	//WriteParam(MicronToADU(axis,value));
-	
+	WriteCommand( com | (value<<8) );	
 
 	Base[axis]=value;
 	if((rtn=ReadReply()) != DONE)
@@ -410,29 +388,25 @@ void SetAmplitude(int axis, float ampM)
 }
 */
 
-void MoveAbsolute(int axis, float target)
+void MoveAbsolute(int axis, unsigned int target)
 {
 	int rtn;
 	if(collecting) { throw (char*)"DSP is still collecting"; } // seb
 	DebugPrint("In MoveAbsolute stub\n");
 
-	if((target > ADUToMicron(axis,MAXDAC)) || (target < 0))
+	if((target > MAXDAC))
 	  throw (char*)"MoveAbsolute would go beyond range limits";
 
-	// 	WriteCommand(MOVE_ABSOLUTE);
-	// 	WriteParam(axis);
-	// 	WriteParam(MicronToADU(axis,target));
-	int p=MicronToADU(axis,target);
 	int com=MOVE_ABSOLUTE_0+axis;
-	WriteCommand( com | (p<<8) );
+	WriteCommand( com | (target<<8) );
 
 	if((rtn=ReadReply()) != DONE)
 		throw (char*)"MoveAbsolute: incorrect reply";
 }
 
-void MoveRelative(int axis, float delta)
+void MoveRelative(int axis, int delta)
 {
-	float current;
+	unsigned int current;
 	if(collecting) { throw (char*)"DSP is still collecting"; } // seb
 	DebugPrint("In MoveRelative stub\n");
 
@@ -599,10 +573,10 @@ void	XframeToFframe(void *in, void *out)
 
 	to->rep = from->rep ;
 	to->step = from->step ;
-	to->adc0 = ADUToMicron(0,(unsigned)(from->pair0 & 0xffff));
-	to->adc1 = ADUToMicron(1,(unsigned)((from->pair0 >> 16) &0xffff));
-	to->adc2 = ADUToMicron(2,(unsigned)(from->pair1 & 0xffff));
-	to->adc3 = ADUToMicron(3,(unsigned)((from->pair1 >> 16) &0xffff));
+	to->adc0 = (unsigned)(from->pair0 & 0xffff);
+	to->adc1 = (unsigned)((from->pair0 >> 16) &0xffff);
+	to->adc2 = (unsigned)(from->pair1 & 0xffff);
+	to->adc3 = (unsigned)((from->pair1 >> 16) &0xffff);
 }
 
 int	Collect(doneCallbackFct *doneCallback)
@@ -654,7 +628,8 @@ int	Collect(doneCallbackFct *doneCallback)
 void  *InitProfile(int reps, HANDLE usrEvent)
 {
 	int rtn;
-	int	i,total;
+	unsigned int i;
+	int total;
 	int high;
 	int nsamples;
 	int index;
@@ -957,17 +932,17 @@ void	Profile_Set(const char *bytes, const int len,
   loaded=TRUE ;
 }
 
-float ADUToMicron(int axis,unsigned int Adu)
-{
-	return (float)(Adu*MicronsPerADU[axis]);
-}
+// float ADUToMicron(int axis,unsigned int Adu)
+// {
+// 	return (float)(Adu*MicronsPerADU[axis]);
+// }
 
-unsigned int MicronToADU(int axis,float Micron)
-{	
-  unsigned int a = (unsigned int)(Micron/MicronsPerADU[axis]);
-  if(a > 0xffff) throw (char*)"piezo conversion out of 16 bit range";
-  return a;
-}
+// unsigned int MicronToADU(int axis,float Micron)
+// {	
+//   unsigned int a = (unsigned int)(Micron/MicronsPerADU[axis]);
+//   if(a > 0xffff) throw (char*)"piezo conversion out of 16 bit range";
+//   return a;
+// }
 
 
 

@@ -73,14 +73,14 @@ void	Profile_Set(const char *bytes, const int len,
 					unsigned int *AnaList1, int nx1, int nAna1,
 					unsigned int *AnaList2, int nx2, int nAna2,
 					unsigned int *AnaList3, int nx3, int nAna3);
-float	ReadPosition(int axis);		// reads DAC
-float	ReadActual(int axis);		// reads ADC
+unsigned int	ReadPosition(int axis);		// reads DAC
+unsigned int	ReadActual(int axis);		// reads ADC
 void	WriteShutter(int value);
 int		ReadShutter();
 void	TriggerSpec();
 //20060829  void 	SetBaseAbsolute(int axis,float value);
-void 	SetAmplitude(int axis, float value);
-void 	MoveAbsolute(int axis, float value);
+// void 	SetAmplitude(int axis, unsigned int value);
+void 	MoveAbsolute(int axis, unsigned int value);
 void 	DownloadProfile();
 void    *InitProfile(int reps, HANDLE UsrEvent);
 
@@ -89,7 +89,7 @@ typedef void doneCallbackFct(unsigned long);
 //seb int		Collect();
  int		Collect(doneCallbackFct *doneCallback);
 void 	Expose(int cameramask);	// cameramask 0x1 - 0xf for all cameras
-void 	MoveRelative(int axis, float value);
+void 	MoveRelative(int axis, int value);
 void 	Flash();
 unsigned int	ReadDigital();
 void 	WriteDigital(int value);
@@ -111,8 +111,8 @@ void	DmaToTarget(int *Inbuf, int *shared, int numwds);
 void	PutHdr( ProStr *p);
 CARDINFO	*GetCardInfo();
 unsigned int	*InitDMA();
-unsigned int	MicronToADU(int axis,float micron);
-float	ADUToMicron(int axis,unsigned int adu);
+//unsigned int	MicronToADU(int axis,float micron);
+//float	ADUToMicron(int axis,unsigned int adu);
 void	WriteCommand(int	Command);
 void	WriteParam(int	param);
 int		ReadReply(int timeoutMS=10);
