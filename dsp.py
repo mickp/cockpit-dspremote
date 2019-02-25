@@ -81,7 +81,7 @@ _logger = Logger()
 
 @Pyro4.expose
 class d:
-    def __init__(self, fn):
+    def __init__(self, fn="OMX_release.out"):
         self._profileInited = False
         self.fn = fn
         self.clientConnection = None
