@@ -110,7 +110,7 @@ class d:
         self.startCollectThread()
         
     def isCollecting(self):
-        return pyC67.cvar.collecting
+        return pyC67.IsCollecting()
 
     def getLastCollectReturn(self):
         return self.collThread.collectReturn
