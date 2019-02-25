@@ -7,12 +7,33 @@ import time
 import uuid
 
 import ctypes
+from numpy.ctypeslib import ndpointer
 
 try:
     pyC67 = ctypes.CDLL("C67")
 except:
     fn = os.path.join(os.path.dirname(__file__), "C67.dll")
     pyC67 = ctypes.CDLL(fn)
+
+pyC67.Profile_Set.argtypes = [
+    ctypes.c_char_p,
+    ctypes.c_int,
+    ndpointer(ctypes.c_uint, flags="C_CONTIGUOUS"),
+    ctypes.c_int,
+    ctypes.c_int,
+    ndpointer(ctypes.c_uint, flags="C_CONTIGUOUS"),
+    ctypes.c_int,
+    ctypes.c_int,
+    ndpointer(ctypes.c_uint, flags="C_CONTIGUOUS"),
+    ctypes.c_int,
+    ctypes.c_int,
+    ndpointer(ctypes.c_uint, flags="C_CONTIGUOUS"),
+    ctypes.c_int,
+    ctypes.c_int,
+    ndpointer(ctypes.c_uint, flags="C_CONTIGUOUS"),
+    ctypes.c_int,
+    ctypes.c_int,
+    ]
 
 LOGGING = True
 
@@ -94,8 +115,14 @@ class d:
         description['nDigital'] = descriptionDict['nDigital']
         description['nAnalog'] = descriptionDict['nAnalog']
 
-        pyC67.Profile_Set(description.tostring(), digList, anaDeltaList0, anaDeltaList1, anaDeltaList2, anaDeltaList3)
-
+        #pyC67.Profile_Set(description.tostring(), digList, anaDeltaList0, anaDeltaList1, anaDeltaList2, anaDeltaList3)
+        dstr = description.tostring()
+        pyC67.Profile_Set(dstr, len(dstr),
+                          digList, digList.shape[0], digList.shape[1],
+                          anaDeltaList0, anaDeltaList0.shape[0], anaDeltaList0.shape[1],
+                          anaDeltaList1, anaDeltaList1.shape[0], anaDeltaList1.shape[1],
+                          anaDeltaList2, anaDeltaList2.shape[0], anaDeltaList2.shape[1],
+                          anaDeltaList3, anaDeltaList3.shape[0], anaDeltaList3.shape[1])
 
     def melError(self, code):
         '''code can be hex number or string (e.g.'4548') '''
