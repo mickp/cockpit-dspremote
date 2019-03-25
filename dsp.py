@@ -133,7 +133,7 @@ class d:
 
     def reInit(self):
         try:
-            pyC67.C67Open( self.fn )
+            pyC67.C67Open( self.fn.encode() )
         except Exception as e:
             # print "reInit failed:", e
             raise RuntimeError(" **** ERROR when C67Open( %s ) : %s" % (self.fn, e))
