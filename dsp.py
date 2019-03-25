@@ -1,4 +1,4 @@
-import ConfigParser
+import configparser
 import os
 import Pyro4
 import threading
@@ -134,7 +134,7 @@ class d:
     def reInit(self):
         try:
             pyC67.C67Open( self.fn )
-        except Exception, e:
+        except Exception as e:
             # print "reInit failed:", e
             raise RuntimeError(" **** ERROR when C67Open( %s ) : %s" % (self.fn, e))
         # Restart the collect thread.
@@ -316,7 +316,7 @@ class CollectThread(threading.Thread):
                         _logger.log("%s: ... calling pyC67.Collect() ..." % self.doEvent.uid)
                         retVal = pyC67.Collect()  # frameCount
                         _logger.log("%s: ... pyC67.Collect() returned ..." % self.doEvent.uid)
-                    except Exception, e: 
+                    except Exception as e:
                         _logger.log("%s: ... exception in collect block." % self.doEvent.uid)
                         retVal = e
                     self.collectReturn = retVal
@@ -360,7 +360,7 @@ class CollectThread(threading.Thread):
                                 _logger.log(traceback.format_exc())
                         else:
                             self.d.Expose(cameras)
-                    except Exception, e:
+                    except Exception as e:
                         _logger.log('Error in arcl ... ' + str(e))
                         _logger.log(traceback.format_exc())
                         raise RuntimeError("Error in arcl: %s", e)
