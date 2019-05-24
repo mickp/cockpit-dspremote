@@ -95,9 +95,20 @@ class d:
         #self.reInit()
 
     def Abort(self):
-        pyC67.Abort()
         _logger.log('Abort')
-        self.startCollectThread()
+        was_collecting = self.isCollecting()
+        try:
+            pyC67.Abort()
+        except:
+            pass
+        if was_collecting:
+            try:
+                self.collThread.do('quit')
+            except:
+                pass
+            time.sleep(0.05)
+            self.collThread.join()
+            self.reInit()
         
     def UpdateNReps(self, newCount):
         pyC67.UpdateNReps( newCount )
@@ -322,7 +333,10 @@ class CollectThread(threading.Thread):
                     self.collectReturn = retVal
 
                     _logger.log("%s: ... calling pyC67.ReadPosition(i) for i in range(4) ..." % self.doEvent.uid)
-                    retVal = retVal, [pyC67.ReadPosition(i) for i in range(4)]
+                    try:
+                        retVal = retVal, [pyC67.ReadPosition(i) for i in range(4)]
+                    except Exception as e:
+                        retval = e
                     _logger.log("%s: ... pyC67.ReadPosition() calls done ..." % self.doEvent.uid)
                     self.clientConnection.receiveData("DSP done", retVal)
                     _logger.log("%s: ... leaving collect block" % self.doEvent.uid)
@@ -423,9 +437,6 @@ class Server(object):
 
         # Do any cleanup.
         daemon.shutdown()
-
-        if hasattr(self.server, 'collThread'):
-            self.server.collThread.stop()
 
         self.daemon_thread.join()
 
